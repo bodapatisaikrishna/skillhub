@@ -1,4 +1,4 @@
-import { AGENTS, CATEGORIES, type Agent, type Category, type Skill } from "@/lib/data/types";
+import { AGENTS, CATEGORIES, type Agent, type Category, type BrowseCard } from "@/lib/data/types";
 
 /**
  * Browse-page filter state and the URL (searchParams) serialization for it.
@@ -82,7 +82,7 @@ export function isEmptyFilters(f: Filters): boolean {
 }
 
 /** Apply filters + sort to a list of skills (pure; used client-side). */
-export function applyFilters(skills: Skill[], f: Filters): Skill[] {
+export function applyFilters<T extends BrowseCard>(skills: T[], f: Filters): T[] {
   const q = f.q.toLowerCase();
 
   const filtered = skills.filter((s) => {

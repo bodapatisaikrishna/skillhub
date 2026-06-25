@@ -11,7 +11,7 @@ import {
   Info,
 } from "lucide-react";
 
-import { getAllSlugs, getSkillBySlug } from "@/lib/data";
+import { getPrerenderSlugs, getSkillBySlug } from "@/lib/data";
 import { AGENT_LABELS } from "@/lib/data/types";
 import { formatStars, formatDate } from "@/lib/format";
 import { AgentBadge } from "@/components/agent-badge";
@@ -29,9 +29,12 @@ interface PageProps {
   params: Promise<{ slug: string }>;
 }
 
-/** Pre-render every known skill at build time. */
+// Pre-render the top subset at build; the rest render on first request (ISR)
+// and are cached. Keeps build time flat as the catalog grows to thousands.
+export const dynamicParams = true;
+
 export async function generateStaticParams() {
-  const slugs = await getAllSlugs();
+  const slugs = await getPrerenderSlugs(200);
   return slugs.map((slug) => ({ slug }));
 }
 

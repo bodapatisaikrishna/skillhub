@@ -1,7 +1,7 @@
 import "server-only";
 import seed from "./seed.json";
 import { readLiveMeta } from "./cache";
-import { CATEGORIES, type Category, type Skill } from "./types";
+import { CATEGORIES, type BrowseCard, type Category, type Skill } from "./types";
 
 /**
  * The single data-access seam for SkillHub.
@@ -29,6 +29,43 @@ function withLiveMeta(skill: Skill, live: Awaited<ReturnType<typeof readLiveMeta
 export async function getAllSkills(): Promise<Skill[]> {
   const live = await readLiveMeta();
   return SEED.map((skill) => withLiveMeta(skill, live));
+}
+
+/**
+ * Trimmed catalog projection for the browse grid. Drops the heavy per-skill
+ * fields (install/longDescription/repoUrl) so the whole catalog can ship to the
+ * client for instant filtering without a multi-MB payload at large sizes.
+ */
+export async function getBrowseCards(): Promise<BrowseCard[]> {
+  const all = await getAllSkills();
+  return all.map((s) => ({
+    slug: s.slug,
+    name: s.name,
+    description: s.description,
+    category: s.category,
+    agents: s.agents,
+    author: s.author,
+    official: s.official,
+    tags: s.tags,
+    stars: s.stars,
+    lastUpdated: s.lastUpdated,
+  }));
+}
+
+/**
+ * Slugs to statically pre-render at build time: official + most-starred first,
+ * capped so build time stays flat as the catalog grows into the thousands. The
+ * rest render on-demand (ISR) on first visit and are then cached.
+ */
+export async function getPrerenderSlugs(limit = 200): Promise<string[]> {
+  const all = await getAllSkills();
+  return [...all]
+    .sort((a, b) => {
+      if (a.official !== b.official) return a.official ? -1 : 1;
+      return (b.stars ?? 0) - (a.stars ?? 0);
+    })
+    .slice(0, limit)
+    .map((s) => s.slug);
 }
 
 /** A single skill by slug, or null if not found. */

@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 
-import { getAllSkills } from "@/lib/data";
+import { getBrowseCards } from "@/lib/data";
 import { BrowseClient } from "@/components/browse-client";
 
 export const metadata: Metadata = {
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 export const revalidate = 3600;
 
 export default async function BrowsePage() {
-  const skills = await getAllSkills();
+  const skills = await getBrowseCards();
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">

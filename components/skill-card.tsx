@@ -1,14 +1,15 @@
 import Link from "next/link";
 import { Star, BadgeCheck } from "lucide-react";
 
-import type { Skill } from "@/lib/data/types";
+import type { BrowseCard } from "@/lib/data/types";
 import { AgentBadge } from "@/components/agent-badge";
 import { Badge } from "@/components/ui/badge";
 import { formatStars } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 interface SkillCardProps {
-  skill: Skill;
+  /** Accepts a full Skill or the trimmed BrowseCard (Skill is assignable). */
+  skill: BrowseCard;
   className?: string;
 }
 
