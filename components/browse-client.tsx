@@ -94,11 +94,16 @@ export function BrowseClient({ skills }: BrowseClientProps) {
             ))}
           </div>
           {visibleCount < results.length && (
-            <div className="flex flex-col items-center gap-2 pt-2">
+            <div className="flex flex-col items-center gap-2 pt-4">
               <p className="text-sm text-muted-foreground">
-                Showing {visible.length} of {results.length}
+                Showing {visible.length.toLocaleString()} of{" "}
+                {results.length.toLocaleString()}
               </p>
-              <Button variant="outline" onClick={loadMore}>
+              <Button
+                variant="outline"
+                onClick={loadMore}
+                className="rounded-full px-6"
+              >
                 Load more
               </Button>
             </div>

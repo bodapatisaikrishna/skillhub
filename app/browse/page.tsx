@@ -20,11 +20,18 @@ export default async function BrowsePage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       <header className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight">Browse skills</h1>
-        <p className="mt-2 text-muted-foreground">
-          {skills.length} skills across {""}
-          <span className="text-foreground">Claude Code, Cursor, Codex, Gemini, Copilot, Windsurf</span>{" "}
-          and more. SkillHub links to source repos — it never hosts or runs code.
+        <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+          Catalog
+        </p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight sm:text-4xl">
+          Browse skills
+        </h1>
+        <p className="mt-2 max-w-2xl text-muted-foreground">
+          <span className="font-medium text-foreground">
+            {skills.length.toLocaleString()}
+          </span>{" "}
+          skills across Claude Code, Cursor, Codex, Gemini, Copilot, Windsurf and
+          more. SkillHub links to source repos — it never hosts or runs code.
         </p>
       </header>
 

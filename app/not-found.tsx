@@ -5,11 +5,15 @@ import { Button } from "@/components/ui/button";
 
 export default function NotFound() {
   return (
-    <div className="mx-auto flex max-w-md flex-col items-center px-4 py-24 text-center">
-      <div className="mb-5 flex size-14 items-center justify-center rounded-2xl bg-accent">
-        <Compass className="size-7 text-primary" aria-hidden="true" />
+    <div className="hero-glow relative mx-auto flex max-w-md flex-col items-center px-4 py-28 text-center">
+      <div
+        className="pointer-events-none absolute inset-0 -z-10 bg-grid [mask-image:radial-gradient(ellipse_60%_50%_at_50%_30%,black,transparent)]"
+        aria-hidden="true"
+      />
+      <div className="mb-5 flex size-14 items-center justify-center rounded-2xl bg-gradient-brand text-white shadow-soft">
+        <Compass className="size-7" aria-hidden="true" />
       </div>
-      <p className="text-sm font-medium text-primary">404</p>
+      <p className="font-mono text-sm font-medium text-primary">404</p>
       <h1 className="mt-1 text-2xl font-semibold tracking-tight">
         Page not found
       </h1>

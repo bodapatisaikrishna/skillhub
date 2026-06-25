@@ -100,6 +100,24 @@ export async function getFeatured(limit = 6): Promise<Skill[]> {
     .slice(0, limit);
 }
 
+/** Headline catalog stats for the home hero (skills / developers / agents / categories). */
+export async function getStats(): Promise<{
+  skills: number;
+  developers: number;
+  agents: number;
+  categories: number;
+}> {
+  const all = await getAllSkills();
+  const developers = new Set(all.map((s) => s.author)).size;
+  const agents = new Set(all.flatMap((s) => s.agents)).size;
+  return {
+    skills: all.length,
+    developers,
+    agents,
+    categories: CATEGORIES.length,
+  };
+}
+
 /** Category list with a live count of skills in each. */
 export async function getCategories(): Promise<{ category: Category; count: number }[]> {
   const all = await getAllSkills();

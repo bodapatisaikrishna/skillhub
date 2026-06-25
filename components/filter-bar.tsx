@@ -42,7 +42,7 @@ export function FilterBar({
     filters.sort !== "relevance";
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 rounded-2xl border border-border bg-card/60 p-4 shadow-sm sm:p-5">
       {/* Search + sort */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
@@ -140,8 +140,11 @@ export function FilterBar({
 
       {/* Result count + clear */}
       <div className="flex items-center justify-between border-t border-border pt-4">
-        <p className="text-sm text-muted-foreground" aria-live="polite">
-          {resultCount} {resultCount === 1 ? "skill" : "skills"}
+        <p aria-live="polite">
+          <span className="inline-flex items-center rounded-full bg-accent px-2.5 py-0.5 text-sm font-medium text-accent-foreground">
+            {resultCount.toLocaleString()}{" "}
+            {resultCount === 1 ? "skill" : "skills"}
+          </span>
         </p>
         {hasActive && (
           <Button variant="ghost" size="sm" onClick={onClear}>

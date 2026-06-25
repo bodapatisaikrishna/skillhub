@@ -13,7 +13,9 @@ import {
 
 import { getPrerenderSlugs, getSkillBySlug } from "@/lib/data";
 import { AGENT_LABELS } from "@/lib/data/types";
+import { CATEGORY_ACCENT } from "@/lib/categories";
 import { formatStars, formatDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { AgentBadge } from "@/components/agent-badge";
 import { InstallSection } from "@/components/install-section";
 import { GithubIcon } from "@/components/icons";
@@ -75,9 +77,14 @@ export default async function SkillPage({ params }: PageProps) {
   if (!skill) notFound();
 
   const lastUpdated = formatDate(skill.lastUpdated);
+  const accent = CATEGORY_ACCENT[skill.category];
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
+    <div className="hero-glow relative mx-auto max-w-3xl px-4 py-10">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-64 bg-grid [mask-image:radial-gradient(ellipse_70%_100%_at_50%_0%,black,transparent)]"
+        aria-hidden="true"
+      />
       <Link
         href="/browse"
         className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -87,39 +94,53 @@ export default async function SkillPage({ params }: PageProps) {
 
       {/* Header */}
       <header className="mt-6">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-3xl font-semibold tracking-tight">{skill.name}</h1>
+        <span
+          className={cn(
+            "inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium",
+            accent.chip,
+          )}
+        >
+          {skill.category}
+        </span>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+            {skill.name}
+          </h1>
           {skill.official && (
             <Badge className="gap-1">
               <BadgeCheck className="size-3.5" aria-hidden="true" /> Official
             </Badge>
           )}
         </div>
-        <p className="mt-2 text-lg text-muted-foreground">{skill.description}</p>
+        <p className="mt-3 text-lg text-muted-foreground">
+          {skill.description}
+        </p>
 
         {/* Meta row */}
-        <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
-          <span className="inline-flex items-center gap-1.5">
-            <User className="size-4" aria-hidden="true" />
+        <div className="mt-5 flex flex-wrap items-center gap-2 text-sm">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-muted-foreground">
+            <User className="size-3.5" aria-hidden="true" />
             {skill.author}
           </span>
-          <Badge variant="outline">{skill.category}</Badge>
           {typeof skill.stars === "number" && (
-            <span className="inline-flex items-center gap-1.5">
-              <Star className="size-4" aria-hidden="true" />
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-muted-foreground">
+              <Star className="size-3.5" aria-hidden="true" />
               {formatStars(skill.stars)} stars
             </span>
           )}
           {lastUpdated && (
-            <span className="inline-flex items-center gap-1.5">
-              <Clock className="size-4" aria-hidden="true" />
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-muted-foreground">
+              <Clock className="size-3.5" aria-hidden="true" />
               Updated {lastUpdated}
             </span>
           )}
         </div>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <Button asChild>
+          <Button
+            asChild
+            className="bg-gradient-brand text-white hover:opacity-90"
+          >
             <a href={skill.repoUrl} target="_blank" rel="noopener noreferrer">
               <GithubIcon className="size-4" /> View on GitHub
               <ExternalLink className="size-3.5" aria-hidden="true" />
