@@ -58,6 +58,26 @@ export interface Skill {
   lastUpdated?: string;
 }
 
+/**
+ * The trimmed projection sent to the browse grid. Omits the heavy fields
+ * (`install`, `longDescription`, `repoUrl`) so the full catalog can be shipped
+ * to the client for instant filtering even at large catalog sizes. Keeps every
+ * field the card renders and the client-side filter/sort/search reads.
+ */
+export type BrowseCard = Pick<
+  Skill,
+  | "slug"
+  | "name"
+  | "description"
+  | "category"
+  | "agents"
+  | "author"
+  | "official"
+  | "tags"
+  | "stars"
+  | "lastUpdated"
+>;
+
 /** The full set of agents, in display order. */
 export const AGENTS: readonly Agent[] = [
   "claude",

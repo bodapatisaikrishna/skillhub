@@ -1,25 +1,9 @@
 import Link from "next/link";
-import {
-  Braces,
-  FlaskConical,
-  Server,
-  BarChart3,
-  Palette,
-  FileText,
-  type LucideIcon,
-} from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 import type { Category } from "@/lib/data/types";
+import { CATEGORY_ACCENT } from "@/lib/categories";
 import { cn } from "@/lib/utils";
-
-const CATEGORY_ICON: Record<Category, LucideIcon> = {
-  Coding: Braces,
-  "Testing/QA": FlaskConical,
-  DevOps: Server,
-  "Data/Analytics": BarChart3,
-  "Design/Frontend": Palette,
-  "Writing/Docs": FileText,
-};
 
 interface CategoryPillProps {
   category: Category;
@@ -29,32 +13,43 @@ interface CategoryPillProps {
   className?: string;
 }
 
-/** A category chip with icon and optional count; links into /browse when given href. */
+/** A category card with a colored icon tile and optional count; links into /browse. */
 export function CategoryPill({
   category,
   count,
   href,
   className,
 }: CategoryPillProps) {
-  const Icon = CATEGORY_ICON[category];
+  const accent = CATEGORY_ACCENT[category];
+  const Icon = accent.icon;
+
   const content = (
     <>
-      <span className="flex size-9 items-center justify-center rounded-lg bg-accent text-accent-foreground">
-        <Icon className="size-4.5" aria-hidden="true" />
+      <span
+        className={cn(
+          "flex size-11 shrink-0 items-center justify-center rounded-xl transition-transform group-hover:scale-105",
+          accent.tile,
+        )}
+      >
+        <Icon className="size-5" aria-hidden="true" />
       </span>
-      <span className="flex flex-col">
-        <span className="text-sm font-medium">{category}</span>
+      <span className="flex min-w-0 flex-col">
+        <span className="font-medium">{category}</span>
         {typeof count === "number" && (
-          <span className="text-xs text-muted-foreground">
-            {count} {count === 1 ? "skill" : "skills"}
+          <span className="text-sm text-muted-foreground">
+            {count.toLocaleString()} {count === 1 ? "skill" : "skills"}
           </span>
         )}
       </span>
+      <ArrowRight
+        className="ml-auto size-4 shrink-0 text-muted-foreground opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100"
+        aria-hidden="true"
+      />
     </>
   );
 
   const base =
-    "group flex items-center gap-3 rounded-xl border border-border bg-card p-3 transition-colors hover:border-primary/40 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+    "card-hover group flex items-center gap-3.5 rounded-2xl border border-border bg-card p-4 shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
   if (href) {
     return (
