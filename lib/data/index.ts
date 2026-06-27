@@ -1,126 +1,90 @@
 import "server-only";
-import { cache } from "react";
 import { unstable_cache } from "next/cache";
-import seed from "./seed.json";
-import { getLiveMeta, type LiveMetaMap } from "./cache";
-import { CATEGORIES, type BrowseCard, type Category, type Skill } from "./types";
-import { applyFilters, type Filters } from "@/lib/filters";
+
+import { getReadClient, hasSupabase } from "./supabase";
+import {
+  AGENTS,
+  CATEGORIES,
+  type BrowseCard,
+  type Category,
+  type Skill,
+} from "./types";
+import { type Filters } from "@/lib/filters";
 
 /**
- * The single data-access seam for SkillHub.
+ * The single data-access seam for SkillHub, backed by Supabase (Postgres).
  *
- * Every page and component reads skills through these functions — never by
- * importing seed.json directly. Today the source is a local JSON seed merged
- * with a live-metadata cache; swapping in Supabase later means changing only
- * this file (and lib/data/cache.ts), not any callers.
+ * Every page/component reads through these functions — never the table
+ * directly. Reads use the anon (RLS public-read) client; the daily sync writes
+ * via the service-role client (see app/api/sync). Hot, repeated reads are
+ * wrapped in unstable_cache (tag "skills") so popular queries serve from
+ * Vercel's Data Cache and the DB isn't hit on every request.
  */
 
-const SEED = seed as Skill[];
+/** Columns needed for the browse grid / cards. */
+const CARD_COLS =
+  "slug,name,description,category,agents,author,official,tags,stars,last_updated";
 
-/** Merge live stars/lastUpdated from the sync cache onto a seed entry. */
-function withLiveMeta(skill: Skill, live: LiveMetaMap): Skill {
-  const meta = live[skill.slug];
-  if (!meta) return skill;
+interface SkillRow {
+  slug: string;
+  name: string;
+  description: string;
+  long_description: string | null;
+  category: string;
+  repo_url: string;
+  author: string;
+  agents: string[];
+  install: Record<string, string>;
+  official: boolean;
+  tags: string[];
+  stars: number | null;
+  last_updated: string | null;
+}
+
+type CardRow = Omit<SkillRow, "long_description" | "repo_url" | "install">;
+
+function rowToSkill(r: SkillRow): Skill {
   return {
-    ...skill,
-    stars: meta.stars ?? skill.stars,
-    lastUpdated: meta.lastUpdated ?? skill.lastUpdated,
+    slug: r.slug,
+    name: r.name,
+    description: r.description,
+    longDescription: r.long_description ?? undefined,
+    category: r.category as Category,
+    repoUrl: r.repo_url,
+    author: r.author,
+    agents: r.agents as Skill["agents"],
+    install: r.install as Skill["install"],
+    official: r.official,
+    tags: r.tags,
+    stars: r.stars ?? undefined,
+    lastUpdated: r.last_updated ?? undefined,
   };
 }
 
-/** Trim a full Skill down to the browse-card projection. */
-function toCard(s: Skill): BrowseCard {
+function rowToCard(r: CardRow): BrowseCard {
   return {
-    slug: s.slug,
-    name: s.name,
-    description: s.description,
-    category: s.category,
-    agents: s.agents,
-    author: s.author,
-    official: s.official,
-    tags: s.tags,
-    stars: s.stars,
-    lastUpdated: s.lastUpdated,
+    slug: r.slug,
+    name: r.name,
+    description: r.description,
+    category: r.category as Category,
+    agents: r.agents as BrowseCard["agents"],
+    author: r.author,
+    official: r.official,
+    tags: r.tags,
+    stars: r.stars ?? undefined,
+    lastUpdated: r.last_updated ?? undefined,
   };
 }
 
-/** Total catalog size — cheap (no live-meta needed); for headers/stats. */
-export function getCatalogCount(): number {
-  return SEED.length;
-}
-
-/**
- * All skills, hydrated with live metadata. Wrapped in React `cache()` so the
- * 10k merge runs at most once per request even when several helpers
- * (getFeatured/getCategories/getStats) ask for it. Live-meta itself is cached
- * in getLiveMeta, so there is no per-request KV round-trip.
- */
-export const getAllSkills = cache(async (): Promise<Skill[]> => {
-  const live = await getLiveMeta();
-  return SEED.map((skill) => withLiveMeta(skill, live));
-});
-
-/**
- * Trimmed catalog projection for the browse grid. Drops the heavy per-skill
- * fields (install/longDescription/repoUrl) so the whole catalog can ship to the
- * client for instant filtering without a multi-MB payload at large sizes.
- */
-export async function getBrowseCards(): Promise<BrowseCard[]> {
-  const all = await getAllSkills();
-  return all.map((s) => ({
-    slug: s.slug,
-    name: s.name,
-    description: s.description,
-    category: s.category,
-    agents: s.agents,
-    author: s.author,
-    official: s.official,
-    tags: s.tags,
-    stars: s.stars,
-    lastUpdated: s.lastUpdated,
-  }));
-}
-
-/**
- * Slugs to statically pre-render at build time: official + most-starred first,
- * capped so build time stays flat as the catalog grows into the thousands. The
- * rest render on-demand (ISR) on first visit and are then cached.
- */
-export async function getPrerenderSlugs(limit = 200): Promise<string[]> {
-  const all = await getAllSkills();
-  return [...all]
-    .sort((a, b) => {
-      if (a.official !== b.official) return a.official ? -1 : 1;
-      return (b.stars ?? 0) - (a.stars ?? 0);
-    })
-    .slice(0, limit)
-    .map((s) => s.slug);
-}
-
-/** A single skill by slug, or null if not found. */
-export async function getSkillBySlug(slug: string): Promise<Skill | null> {
-  const skill = SEED.find((s) => s.slug === slug);
-  if (!skill) return null;
-  const live = await getLiveMeta();
-  return withLiveMeta(skill, live);
-}
+// ---------------------------------------------------------------------------
+// Browse: filtered + sorted + paginated, cached per query.
+// ---------------------------------------------------------------------------
 
 export interface BrowsePageResult {
   items: BrowseCard[];
   total: number;
 }
 
-/**
- * One filtered + paginated page of the browse grid, cached per query in
- * Vercel's Data Cache. Popular queries (default list, common category/agent
- * filters, first pages) are re-served from cache with no recompute under load.
- * The result is small (≤ pageSize cards + a count). Page is clamped to range so
- * out-of-bounds requests return the last page's slice. Cache entries are
- * invalidated by revalidateTag("skills") after the daily sync.
- *
- * @param _cacheKey normalized "filters|page|pageSize" string; only differentiates
- *   cache entries (the real inputs follow).
- */
 export const getBrowsePage = unstable_cache(
   async (
     _cacheKey: string,
@@ -128,66 +92,246 @@ export const getBrowsePage = unstable_cache(
     page: number,
     pageSize: number,
   ): Promise<BrowsePageResult> => {
-    void _cacheKey; // only used to differentiate cache entries
-    const all = await getAllSkills();
-    const results = applyFilters(all, filters);
-    const total = results.length;
-    const totalPages = Math.max(1, Math.ceil(total / pageSize));
-    const p = Math.min(Math.max(1, page), totalPages);
-    const items = results.slice((p - 1) * pageSize, p * pageSize).map(toCard);
-    return { items, total };
+    void _cacheKey; // only differentiates cache entries
+    if (!hasSupabase()) return { items: [], total: 0 };
+    const client = getReadClient();
+
+    // Filter methods return the same builder, so reassignment is safe here.
+    let filtered = client.from("skills").select(CARD_COLS, { count: "exact" });
+    if (filters.categories.length) {
+      filtered = filtered.in("category", filters.categories);
+    }
+    if (filters.agents.length) {
+      filtered = filtered.overlaps("agents", filters.agents);
+    }
+    if (filters.q) {
+      filtered = filtered.textSearch("fts", filters.q, {
+        type: "websearch",
+        config: "english",
+      });
+    }
+
+    // Ordering returns a transform builder — apply it as a single expression
+    // (not reassigned back onto `filtered`) to keep the types clean.
+    const ordered =
+      filters.sort === "stars"
+        ? filtered.order("stars", { ascending: false, nullsFirst: false })
+        : filters.sort === "updated"
+          ? filtered.order("last_updated", {
+              ascending: false,
+              nullsFirst: false,
+            })
+          : filters.sort === "name"
+            ? filtered.order("name", { ascending: true })
+            : filtered
+                .order("official", { ascending: false })
+                .order("stars", { ascending: false, nullsFirst: false });
+
+    const from = Math.max(0, (page - 1) * pageSize);
+    const { data, count, error } = await ordered
+      .range(from, from + pageSize - 1)
+      .returns<CardRow[]>();
+    if (error) {
+      console.error("[data] getBrowsePage:", error.message);
+      return { items: [], total: 0 };
+    }
+    return { items: (data ?? []).map(rowToCard), total: count ?? 0 };
   },
   ["browse-page"],
+  { revalidate: 120, tags: ["skills"] },
+);
+
+// ---------------------------------------------------------------------------
+// Single skill.
+// ---------------------------------------------------------------------------
+
+export async function getSkillBySlug(slug: string): Promise<Skill | null> {
+  if (!hasSupabase()) return null;
+  const client = getReadClient();
+  const { data, error } = await client
+    .from("skills")
+    .select("*")
+    .eq("slug", slug)
+    .maybeSingle<SkillRow>();
+  if (error) {
+    console.error("[data] getSkillBySlug:", error.message);
+    return null;
+  }
+  return data ? rowToSkill(data) : null;
+}
+
+// ---------------------------------------------------------------------------
+// Home: featured, category counts, headline stats.
+// ---------------------------------------------------------------------------
+
+export const getFeatured = unstable_cache(
+  async (limit = 6): Promise<BrowseCard[]> => {
+    if (!hasSupabase()) return [];
+    const client = getReadClient();
+    const { data, error } = await client
+      .from("skills")
+      .select(CARD_COLS)
+      .order("official", { ascending: false })
+      .order("stars", { ascending: false, nullsFirst: false })
+      .limit(limit)
+      .returns<CardRow[]>();
+    if (error) {
+      console.error("[data] getFeatured:", error.message);
+      return [];
+    }
+    return (data ?? []).map(rowToCard);
+  },
+  ["featured"],
   { revalidate: 300, tags: ["skills"] },
 );
 
-/** All known slugs — used for static params and the sitemap. */
+export const getCategories = unstable_cache(
+  async (): Promise<{ category: Category; count: number }[]> => {
+    if (!hasSupabase()) {
+      return CATEGORIES.map((category) => ({ category, count: 0 }));
+    }
+    const client = getReadClient();
+    const { data, error } = await client.rpc("skills_category_counts");
+    if (error) {
+      console.error("[data] getCategories:", error.message);
+      return CATEGORIES.map((category) => ({ category, count: 0 }));
+    }
+    const counts = new Map<string, number>(
+      (data ?? []).map((r: { category: string; count: number }) => [
+        r.category,
+        Number(r.count),
+      ]),
+    );
+    return CATEGORIES.map((category) => ({
+      category,
+      count: counts.get(category) ?? 0,
+    }));
+  },
+  ["category-counts"],
+  { revalidate: 300, tags: ["skills"] },
+);
+
+export const getStats = unstable_cache(
+  async (): Promise<{
+    skills: number;
+    developers: number;
+    agents: number;
+    categories: number;
+  }> => {
+    if (!hasSupabase()) {
+      return {
+        skills: 0,
+        developers: 0,
+        agents: AGENTS.length,
+        categories: CATEGORIES.length,
+      };
+    }
+    const client = getReadClient();
+    const { data, error } = await client.rpc("skills_stats");
+    const row = (data ?? [])[0] as
+      | { skills: number; developers: number }
+      | undefined;
+    if (error) console.error("[data] getStats:", error.message);
+    return {
+      skills: Number(row?.skills ?? 0),
+      developers: Number(row?.developers ?? 0),
+      agents: AGENTS.length,
+      categories: CATEGORIES.length,
+    };
+  },
+  ["stats"],
+  { revalidate: 300, tags: ["skills"] },
+);
+
+export const getCatalogCount = unstable_cache(
+  async (): Promise<number> => {
+    if (!hasSupabase()) return 0;
+    const client = getReadClient();
+    const { count, error } = await client
+      .from("skills")
+      .select("slug", { count: "exact", head: true });
+    if (error) {
+      console.error("[data] getCatalogCount:", error.message);
+      return 0;
+    }
+    return count ?? 0;
+  },
+  ["catalog-count"],
+  { revalidate: 300, tags: ["skills"] },
+);
+
+// ---------------------------------------------------------------------------
+// Build-time / sitemap helpers (resilient: never throw a build).
+// ---------------------------------------------------------------------------
+
+/** Top slugs to statically pre-render; the rest render on-demand (ISR). */
+export async function getPrerenderSlugs(limit = 200): Promise<string[]> {
+  if (!hasSupabase()) return [];
+  try {
+    const client = getReadClient();
+    const { data, error } = await client
+      .from("skills")
+      .select("slug")
+      .order("official", { ascending: false })
+      .order("stars", { ascending: false, nullsFirst: false })
+      .limit(limit)
+      .returns<{ slug: string }[]>();
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((r) => r.slug);
+  } catch (err) {
+    console.error("[data] getPrerenderSlugs (falling back to on-demand):", err);
+    return [];
+  }
+}
+
+/** Every slug — for the sitemap. Paginated to fetch all rows past PostgREST caps. */
 export async function getAllSlugs(): Promise<string[]> {
-  return SEED.map((s) => s.slug);
+  if (!hasSupabase()) return [];
+  try {
+    const client = getReadClient();
+    const out: string[] = [];
+    const size = 1000;
+    for (let start = 0; ; start += size) {
+      const { data, error } = await client
+        .from("skills")
+        .select("slug")
+        .order("slug", { ascending: true })
+        .range(start, start + size - 1)
+        .returns<{ slug: string }[]>();
+      if (error) throw new Error(error.message);
+      const batch = data ?? [];
+      out.push(...batch.map((r) => r.slug));
+      if (batch.length < size) break;
+    }
+    return out;
+  } catch (err) {
+    console.error("[data] getAllSlugs:", err);
+    return [];
+  }
 }
 
 /** (slug, repoUrl) pairs for the GitHub sync to iterate over. */
-export async function getSyncTargets(): Promise<{ slug: string; repoUrl: string }[]> {
-  return SEED.map((s) => ({ slug: s.slug, repoUrl: s.repoUrl }));
-}
-
-/**
- * Featured skills for the home page. Official skills first, then by stars
- * (live, when present), capped to `limit`.
- */
-export async function getFeatured(limit = 6): Promise<Skill[]> {
-  const all = await getAllSkills();
-  return [...all]
-    .sort((a, b) => {
-      if (a.official !== b.official) return a.official ? -1 : 1;
-      return (b.stars ?? 0) - (a.stars ?? 0);
-    })
-    .slice(0, limit);
-}
-
-/** Headline catalog stats for the home hero (skills / developers / agents / categories). */
-export async function getStats(): Promise<{
-  skills: number;
-  developers: number;
-  agents: number;
-  categories: number;
-}> {
-  const all = await getAllSkills();
-  const developers = new Set(all.map((s) => s.author)).size;
-  const agents = new Set(all.flatMap((s) => s.agents)).size;
-  return {
-    skills: all.length,
-    developers,
-    agents,
-    categories: CATEGORIES.length,
-  };
-}
-
-/** Category list with a live count of skills in each. */
-export async function getCategories(): Promise<{ category: Category; count: number }[]> {
-  const all = await getAllSkills();
-  return CATEGORIES.map((category) => ({
-    category,
-    count: all.filter((s) => s.category === category).length,
-  }));
+export async function getSyncTargets(): Promise<
+  { slug: string; repoUrl: string }[]
+> {
+  if (!hasSupabase()) return [];
+  const client = getReadClient();
+  const out: { slug: string; repoUrl: string }[] = [];
+  const size = 1000;
+  for (let start = 0; ; start += size) {
+    const { data, error } = await client
+      .from("skills")
+      .select("slug,repo_url")
+      .order("slug", { ascending: true })
+      .range(start, start + size - 1)
+      .returns<{ slug: string; repo_url: string }[]>();
+    if (error) {
+      console.error("[data] getSyncTargets:", error.message);
+      break;
+    }
+    const batch = data ?? [];
+    out.push(...batch.map((r) => ({ slug: r.slug, repoUrl: r.repo_url })));
+    if (batch.length < size) break;
+  }
+  return out;
 }

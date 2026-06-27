@@ -34,7 +34,7 @@ export default async function BrowsePage({ searchParams }: BrowsePageProps) {
     PAGE_SIZE,
   );
 
-  const catalogCount = getCatalogCount();
+  const catalogCount = await getCatalogCount();
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Math.min(Math.max(1, rawPage), totalPages);
 
