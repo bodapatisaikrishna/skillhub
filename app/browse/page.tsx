@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
-import { getBrowseCards } from "@/lib/data";
-import { applyFilters, parseFilters } from "@/lib/filters";
+import { getBrowsePage, getCatalogCount } from "@/lib/data";
+import { parseFilters, serializeFilters } from "@/lib/filters";
 import { BrowseClient } from "@/components/browse-client";
 
 export const metadata: Metadata = {
@@ -24,15 +24,19 @@ interface BrowsePageProps {
 export default async function BrowsePage({ searchParams }: BrowsePageProps) {
   const sp = await searchParams;
   const filters = parseFilters(sp);
-
-  const all = await getBrowseCards();
-  const results = applyFilters(all, filters);
-
-  const total = results.length;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const rawPage = Number(Array.isArray(sp.page) ? sp.page[0] : sp.page) || 1;
+
+  const cacheKey = `${serializeFilters(filters).toString()}|${rawPage}|${PAGE_SIZE}`;
+  const { items, total } = await getBrowsePage(
+    cacheKey,
+    filters,
+    rawPage,
+    PAGE_SIZE,
+  );
+
+  const catalogCount = getCatalogCount();
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Math.min(Math.max(1, rawPage), totalPages);
-  const items = results.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -45,7 +49,7 @@ export default async function BrowsePage({ searchParams }: BrowsePageProps) {
         </h1>
         <p className="mt-2 max-w-2xl text-muted-foreground">
           <span className="font-medium text-foreground">
-            {all.length.toLocaleString()}
+            {catalogCount.toLocaleString()}
           </span>{" "}
           skills across Claude Code, Cursor, Codex, Gemini, Copilot, Windsurf and
           more. SkillHub links to source repos — it never hosts or runs code.

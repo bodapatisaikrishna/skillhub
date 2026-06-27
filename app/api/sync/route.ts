@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 
 import { getSyncTargets } from "@/lib/data";
 import {
@@ -83,6 +83,11 @@ export async function GET(request: Request) {
       { status: 500 },
     );
   }
+
+  // Invalidate the cached data layer (live-meta read + per-query browse pages)
+  // so the freshly synced stars/dates appear on the next render.
+  revalidateTag("live-meta");
+  revalidateTag("skills");
 
   // Refresh statically-rendered pages so they pick up the new metadata.
   revalidatePath("/");
