@@ -1,4 +1,5 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -79,6 +80,18 @@ export async function readLiveMeta(): Promise<LiveMetaMap> {
     return {};
   }
 }
+
+/**
+ * Cached live-metadata read. The map is small (slug → stars/date), so caching it
+ * removes the per-request KV round-trip under load — the hot path for /browse.
+ * Refreshed every 10 minutes, or immediately when /api/sync calls
+ * revalidateTag("live-meta") after a successful write.
+ */
+export const getLiveMeta = unstable_cache(
+  async (): Promise<LiveMetaMap> => readLiveMeta(),
+  ["skillhub-live-meta"],
+  { revalidate: 600, tags: ["live-meta"] },
+);
 
 /** Persist the live-metadata cache. Used by /api/sync. Throws on KV failure. */
 export async function writeLiveMeta(data: LiveMetaMap): Promise<void> {
