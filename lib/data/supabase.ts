@@ -32,8 +32,10 @@ export function getReadClient(): SupabaseClient {
       "Supabase read client unavailable: set SUPABASE_URL and SUPABASE_ANON_KEY.",
     );
   }
-  read ??= createClient(URL, ANON, { auth: { persistSession: false } });
-  return read;
+  const client =
+    read ?? createClient(URL, ANON, { auth: { persistSession: false } });
+  read = client;
+  return client;
 }
 
 export function getWriteClient(): SupabaseClient {
@@ -42,6 +44,8 @@ export function getWriteClient(): SupabaseClient {
       "Supabase write client unavailable: set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.",
     );
   }
-  write ??= createClient(URL, SERVICE, { auth: { persistSession: false } });
-  return write;
+  const client =
+    write ?? createClient(URL, SERVICE, { auth: { persistSession: false } });
+  write = client;
+  return client;
 }

@@ -152,12 +152,14 @@ export async function getSkillBySlug(slug: string): Promise<Skill | null> {
     .from("skills")
     .select("*")
     .eq("slug", slug)
-    .maybeSingle<SkillRow>();
+    .limit(1)
+    .returns<SkillRow[]>();
   if (error) {
     console.error("[data] getSkillBySlug:", error.message);
     return null;
   }
-  return data ? rowToSkill(data) : null;
+  const row = data?.[0];
+  return row ? rowToSkill(row) : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -196,11 +198,9 @@ export const getCategories = unstable_cache(
       console.error("[data] getCategories:", error.message);
       return CATEGORIES.map((category) => ({ category, count: 0 }));
     }
+    const rows = (data ?? []) as { category: string; count: number }[];
     const counts = new Map<string, number>(
-      (data ?? []).map((r: { category: string; count: number }) => [
-        r.category,
-        Number(r.count),
-      ]),
+      rows.map((r) => [r.category, Number(r.count)]),
     );
     return CATEGORIES.map((category) => ({
       category,
@@ -228,9 +228,8 @@ export const getStats = unstable_cache(
     }
     const client = getReadClient();
     const { data, error } = await client.rpc("skills_stats");
-    const row = (data ?? [])[0] as
-      | { skills: number; developers: number }
-      | undefined;
+    const rows = (data ?? []) as { skills: number; developers: number }[];
+    const row = rows[0];
     if (error) console.error("[data] getStats:", error.message);
     return {
       skills: Number(row?.skills ?? 0),
