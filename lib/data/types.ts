@@ -20,11 +20,15 @@ export type Agent =
 /** Top-level catalog categories. */
 export type Category =
   | "Coding"
+  | "AI/ML"
+  | "Security"
   | "Testing/QA"
   | "DevOps"
   | "Data/Analytics"
   | "Design/Frontend"
-  | "Writing/Docs";
+  | "Mobile"
+  | "Writing/Docs"
+  | "Business";
 
 /**
  * A single catalog entry: a GitHub repo or folder containing a SKILL.md / rules
@@ -93,11 +97,15 @@ export const AGENTS: readonly Agent[] = [
 /** The full set of categories, in display order. */
 export const CATEGORIES: readonly Category[] = [
   "Coding",
+  "AI/ML",
+  "Security",
   "Testing/QA",
   "DevOps",
   "Data/Analytics",
   "Design/Frontend",
+  "Mobile",
   "Writing/Docs",
+  "Business",
 ] as const;
 
 /** Human-friendly labels for each agent. */

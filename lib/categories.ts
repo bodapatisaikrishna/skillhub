@@ -5,6 +5,10 @@ import {
   BarChart3,
   Palette,
   FileText,
+  BrainCircuit,
+  ShieldCheck,
+  Smartphone,
+  Briefcase,
   type LucideIcon,
 } from "lucide-react";
 
@@ -54,5 +58,25 @@ export const CATEGORY_ACCENT: Record<Category, CategoryAccent> = {
     icon: FileText,
     tile: "bg-teal-500/12 text-teal-600 dark:text-teal-400",
     chip: "bg-teal-500/10 text-teal-700 dark:text-teal-300",
+  },
+  "AI/ML": {
+    icon: BrainCircuit,
+    tile: "bg-fuchsia-500/12 text-fuchsia-600 dark:text-fuchsia-400",
+    chip: "bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300",
+  },
+  Security: {
+    icon: ShieldCheck,
+    tile: "bg-red-500/12 text-red-600 dark:text-red-400",
+    chip: "bg-red-500/10 text-red-700 dark:text-red-300",
+  },
+  Mobile: {
+    icon: Smartphone,
+    tile: "bg-indigo-500/12 text-indigo-600 dark:text-indigo-400",
+    chip: "bg-indigo-500/10 text-indigo-700 dark:text-indigo-300",
+  },
+  Business: {
+    icon: Briefcase,
+    tile: "bg-orange-500/12 text-orange-600 dark:text-orange-400",
+    chip: "bg-orange-500/10 text-orange-700 dark:text-orange-300",
   },
 };
