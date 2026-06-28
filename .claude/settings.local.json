@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm -v)",
+      "Bash(npm -v)",
+      "Bash(gh --version)",
+      "Bash(echo \"npm: $\\(npm -v || echo MISSING\\)\")",
+      "Bash(npx -v)",
+      "Bash(echo \"npx: $\\(npx -v || echo MISSING\\)\")",
+      "Bash(echo \"gh: $\\(gh --version)"
+    ]
+  }
+}
