@@ -2,29 +2,32 @@ import { NextResponse } from "next/server";
 import { revalidatePath, revalidateTag } from "next/cache";
 
 import { getSyncTargets } from "@/lib/data";
-import {
-  readLiveMeta,
-  writeLiveMeta,
-  isSharedCache,
-  type LiveMetaMap,
-} from "@/lib/data/cache";
+import { getWriteClient } from "@/lib/data/supabase";
 import { fetchRepoMeta, hasGitHubToken } from "@/lib/github";
 
-// Uses the filesystem (cache write) → Node runtime, never statically cached.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// Long-running on a full catalog; allow up to 5 min (Vercel cron).
+export const maxDuration = 300;
 
 /** Be polite to the API and avoid burst rate-limiting on the unauthenticated path. */
 async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+interface StarUpdate {
+  slug: string;
+  stars: number;
+  last_updated: string | null;
+}
+
 /**
  * Daily GitHub metadata sync (wired to a Vercel cron in vercel.json).
  *
- * Iterates the seed repos, fetches stars + last-push, and writes the live cache.
- * Failures are collected per-repo and never abort the run — pages always render
- * from the seed even if this never succeeds.
+ * Iterates the catalog repos, fetches stars + last-push, and writes them back to
+ * the `skills` table via the service-role client (batched RPC). Failures are
+ * collected per-repo and never abort the run — pages always render from the DB
+ * even if this never fully succeeds.
  *
  * Optional auth: if CRON_SECRET is set, require a matching Bearer token (Vercel
  * Cron sends `Authorization: Bearer <CRON_SECRET>` automatically).
@@ -48,61 +51,61 @@ export async function GET(request: Request) {
   const targets = await getSyncTargets();
   const throttled = !hasGitHubToken();
 
-  // Start from the existing cache so a partial run never drops good data.
-  const cache: LiveMetaMap = { ...(await readLiveMeta()) };
-
-  let updated = 0;
+  const updates: StarUpdate[] = [];
   let rateLimited = false;
   const failures: { slug: string; reason: string }[] = [];
 
   for (const { slug, repoUrl } of targets) {
     const result = await fetchRepoMeta(repoUrl);
     if (result.ok) {
-      cache[slug] = {
+      updates.push({
+        slug,
         stars: result.meta.stars,
-        lastUpdated: result.meta.lastUpdated,
-      };
-      updated += 1;
+        last_updated: result.meta.lastUpdated?.slice(0, 10) ?? null,
+      });
     } else {
       failures.push({ slug, reason: result.reason });
       if (result.reason === "rate-limited") {
         rateLimited = true;
-        // No point hammering once rate-limited — stop early, keep what we have.
-        break;
+        break; // stop hammering; persist what we have
       }
     }
     if (throttled) await sleep(150);
   }
 
+  // Persist to Postgres in batches via the update_skill_stars RPC.
+  let persisted = 0;
   try {
-    await writeLiveMeta(cache);
+    const client = getWriteClient();
+    const BATCH = 1000;
+    for (let i = 0; i < updates.length; i += BATCH) {
+      const chunk = updates.slice(i, i + BATCH);
+      const { error } = await client.rpc("update_skill_stars", {
+        updates: chunk,
+      });
+      if (error) throw new Error(error.message);
+      persisted += chunk.length;
+    }
   } catch (err) {
-    console.error("[sync] Failed to persist live cache:", err);
+    console.error("[sync] Failed to persist to DB:", err);
     return NextResponse.json(
-      { ok: false, error: "cache-write-failed", updated, failures },
+      { ok: false, error: "db-write-failed", updated: persisted, failures },
       { status: 500 },
     );
   }
 
-  // Invalidate the cached data layer (live-meta read + per-query browse pages)
-  // so the freshly synced stars/dates appear on the next render.
-  revalidateTag("live-meta");
+  // Invalidate cached browse pages / stats so synced stars appear promptly.
   revalidateTag("skills");
-
-  // Refresh statically-rendered pages so they pick up the new metadata.
   revalidatePath("/");
   revalidatePath("/browse");
-  for (const { slug } of targets) revalidatePath(`/skill/${slug}`);
 
   return NextResponse.json({
     ok: true,
     syncedAt: new Date().toISOString(),
     total: targets.length,
-    updated,
+    updated: persisted,
     rateLimited,
     authenticated: hasGitHubToken(),
-    // true → Vercel KV (shared across lambdas); false → local temp file only.
-    sharedCache: isSharedCache(),
     failures,
   });
 }
