@@ -20,6 +20,7 @@ export type Agent =
 /** Top-level catalog categories. */
 export type Category =
   | "Coding"
+  | "Backend/API"
   | "AI/ML"
   | "Security"
   | "Testing/QA"
@@ -27,7 +28,10 @@ export type Category =
   | "Data/Analytics"
   | "Design/Frontend"
   | "Mobile"
+  | "Game Dev"
+  | "Blockchain/Web3"
   | "Writing/Docs"
+  | "Productivity"
   | "Business";
 
 /**
@@ -97,6 +101,7 @@ export const AGENTS: readonly Agent[] = [
 /** The full set of categories, in display order. */
 export const CATEGORIES: readonly Category[] = [
   "Coding",
+  "Backend/API",
   "AI/ML",
   "Security",
   "Testing/QA",
@@ -104,7 +109,10 @@ export const CATEGORIES: readonly Category[] = [
   "Data/Analytics",
   "Design/Frontend",
   "Mobile",
+  "Game Dev",
+  "Blockchain/Web3",
   "Writing/Docs",
+  "Productivity",
   "Business",
 ] as const;
 
