@@ -9,6 +9,10 @@ import {
   ShieldCheck,
   Smartphone,
   Briefcase,
+  Network,
+  Gamepad2,
+  ListTodo,
+  Blocks,
   type LucideIcon,
 } from "lucide-react";
 
@@ -78,5 +82,25 @@ export const CATEGORY_ACCENT: Record<Category, CategoryAccent> = {
     icon: Briefcase,
     tile: "bg-orange-500/12 text-orange-600 dark:text-orange-400",
     chip: "bg-orange-500/10 text-orange-700 dark:text-orange-300",
+  },
+  "Backend/API": {
+    icon: Network,
+    tile: "bg-cyan-500/12 text-cyan-600 dark:text-cyan-400",
+    chip: "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300",
+  },
+  "Game Dev": {
+    icon: Gamepad2,
+    tile: "bg-lime-500/12 text-lime-600 dark:text-lime-400",
+    chip: "bg-lime-500/10 text-lime-700 dark:text-lime-300",
+  },
+  Productivity: {
+    icon: ListTodo,
+    tile: "bg-pink-500/12 text-pink-600 dark:text-pink-400",
+    chip: "bg-pink-500/10 text-pink-700 dark:text-pink-300",
+  },
+  "Blockchain/Web3": {
+    icon: Blocks,
+    tile: "bg-yellow-500/12 text-yellow-600 dark:text-yellow-400",
+    chip: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-300",
   },
 };
